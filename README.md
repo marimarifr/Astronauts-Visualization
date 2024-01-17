@@ -4,9 +4,9 @@ Neste repositório está presente a segunda avaliação da disciplina Análise E
 
 A base de dados escolhida foi **"NASA Astronauts, do kaggle 1959-Present"**. Esse conjunto de dados foi publicado pela 'National Aeronautics and Space Administration' como "Astronaut Fact Book" (edição de abril de 2013). Os nomes das missões dos astronautas ativos e as estatísticas de voo foram atualizados no site da NASA.
 
-A pergunta a ser respondida a partir dos dados é: 
+<h2  align="center"> Como são os astronautas? </h2>
 
-**COMO SÃO OS ASTRONAUTAS?**
+Esta é a pergunta a ser respondida a partir dos dados. 
 
 Quais são as características mais recorrentes em astronautas da Nasa?
 
@@ -19,6 +19,7 @@ Para a produção da peça gráfica, fizemos uso do R para a confecção do grá
 Os detalhes de construção do gráfico e manipulação dos dados estão descritos no arquivo "Construção"
 
 Peça finalizada:
+
 <img src="Peça final\1.png" alt="Peça Finalizada">
 <img src="Peça final\2.png" alt="Peça Finalizada">
 
