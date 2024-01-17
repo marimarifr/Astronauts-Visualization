@@ -1,0 +1,392 @@
+---
+title: "A2 - AEDV"
+author: "Mariana Fernandes Rocha  e  Paula Eduarda de Lima"
+date: "2023-06-01"
+output: 
+  html_document:
+    number_sections: no
+    highlight: pygments
+    theme:  sandstone
+    toc: yes
+    toc_float:
+      collapsed: yes
+      smmoth_scroll: no
+  pdf_document:
+    toc: yes
+---
+
+# Parte A
+
+-   A base de dados escolhida foi **"NASA Astronauts, do kaggle 1959-Present"**. É a mesma base que a Mariana já tinha trabalhado em exercícios anteriores. Optamos por trabalhar com essa base pois achamos o assunto muito 
+interessante e já tinhamos familiaridade com os dados.
+
+
+    Esse conjunto de dados foi publicado pela 'National Aeronautics and Space Administration' como "Astronaut Fact Book" (edição de abril de 2013). Os nomes das missões dos astronautas ativos e as estatísticas de voo foram atualizados no site da NASA. Pode ser acessado em: <https://www.kaggle.com/datasets/nasa/astronaut-yearbook>.
+
+-   A pergunta a ser respondida a partir dos dados é: 
+**"COMO SÃO OS ASTRONAUTAS?"**.
+
+    Quais são as características mais recorrentes em astronautas da Nasa?
+
+    Questões como: Quanto tempo a maioria dos astronautas passou no espaço? Qual o curso que a maioria dos astronautas se formou? Houveram mais astronautas civis ou que serviram nas forças armadas? Qual a proporoção de astronautas mulheres para homens?
+    
+    Esses e outros questionamentos serão respondidos pelo gráfico que representa os dados sobre os Astronautas que fizeram parte da equipe da Nasa.
+
+-   Referência visual:
+
+    Durante a pesquisa, foi encontrada uma visualição muito interessante sobre astronautas que nos chamou muito a atenção. Essa, nos serviu como refência e inspiração para a produção de nossa peça gráfica.
+
+    A referência pode ser encontrada no site: <https://www.behance.net/gallery/86241381/Data-Visualisation-What-it-takes-to-go-to-space?tracking_source=search_projects_recommended%7Cdata%20journalism%20%26>
+
+
+-   Outras inspirações:
+
+    <https://www.reddit.com/r/DataArt/>
+
+    <https://www.reddit.com/r/DataArt/comments/10n0w11/oc_ukraine_aid_packages_visualized/>
+
+    A ideia inicial era seguir a mesma linha e fazer um gráfico Sankey parecido, adicionando algumas alterações que julgamos necessárias, adaptando alguns pontos e adicionando elementos para compor a ideia.
+
+# Parte B
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+if(!require(utf8)) install.packages("utf8") 
+library(utf8)
+Sys.setlocale("LC_ALL", "pt_br.utf-8") 
+
+if(!require(tidyverse)) install.packages("tidyverse")
+if(!require(ggthemes)) install.packages("ggthemes")
+if(!require(ggplot2)) install.packages("ggplot2")
+if(!require(tidyverse)) install.packages("tidyverse")
+if(!require(dplyr)) install.packages("dplyr")
+if(!require(ggsankey)) install.packages("ggsankey")
+if(!require(stringr)) install.packages("stringr")
+
+if(!require(remotes)) install.packages("remotes")
+ remotes::install_github("davidsjoberg/ggsankey")
+
+```
+
+```{r, message=FALSE, warning=FALSE}
+library(dplyr)
+library(ggplot2)
+library(ggsankey)
+library(stringr)
+```
+
+## Manipulação da base:
+
+Para a produção do gráfico tivemos um grande problema com algumas colunas de dados, pela maneira como as informações estavam dispostas. Por isso tivemos que manipular um pouco, de maneira a arrumar e deixar os dados próprios para o gráfico Sankey.
+
+
+- Lendo a base de dados:
+
+```{r}
+astronauts <- read.csv("astronauts.csv")
+```
+
+- Adicionando a coluna de países:
+
+Primeiramente, uma das informções presentes nos dados era a cidade de nascimento dos astronautas. Para utilizar esse dado, criamos uma nova coluna chamada 'Country', apenas os países de nascimento, para diminuir o número de variáveis.
+
+```{r}
+states<-c("AL","AK","AZ","AR","CA","CO","CT","DE","FL","GA","HI","ID","IL","IN","IA","KS","KY","LA","ME","MD","MA","MI","MN","MS","MO","MT","NE","NV","NH","NJ","NM","NY","NC","ND","OH","OK","OR","PA","RI","SC","SD","TN","TX","UT","VT","VA","WA","WV","WI","WY","Richfield. UT","DC")
+birth.place1<-gsub('(.*, )|(\\*. )', '', astronauts$Birth.Place)
+astronauts$Country <-birth.place1
+astronauts$Country[birth.place1 %in% states]<-"USA"
+astronauts$Country <- as.factor(astronauts$Country)
+```
+
+- Eliminando dados vazios na coluna military rank:
+
+O próximo feito foi preencher os dados vázios da variável  que representava o cargo militar dos astronautas, para isso colocamos como 'civil', os que não tinham cargo militar.
+
+```{r}
+astronauts$Military.Rank[astronauts$Military.Rank==""]="Civil"
+```
+
+- Reproduzindo os valores em graduate para undergraduate
+
+Alguns astronautas estavam preenchidos na coluna de pós-graduação, mas não estavam preenchidos na coluna de gradução. Por isso, completamos esse dados faltante como o mesmo curso da pós-graduação, porque se tem pós, tem que ter graduação.
+
+```{r}
+astronauts$Undergraduate.Major[astronauts$Undergraduate.Major==""] = astronauts$Graduate.Major[astronauts$Undergraduate.Major==""]
+```
+
+- Dividindo a coluna de universidades e colocando só o primeiro valor na base:
+
+Para diminuir o número de variáveis no campo de formação dos astronautas, nós criamos uma nova coluna chamada 'study', onde preenchemos apenas com o primeiro curso.
+
+```{r}
+# Separando em colunas as formações distintas
+dfmajor <- str_split_fixed(astronauts$Graduate.Major, ';',2)
+dfmajor <- data.frame(dfmajor)
+# Criando a nova coluna
+astronauts$Study <- c(dfmajor$X1)
+```
+
+- Preenchendo os dados vazios de 'Study' 
+
+E as células que estavam vazias na graduação, colocamos 'no graduation'.
+
+```{r}
+astronauts$Study[astronauts$Study==""]="No graduation"
+```
+
+Exibindo as formações presentes na coluna:
+```{r}
+sort(unique(astronauts$Study))
+```
+
+- Renomeando os crusos:
+
+POr último, renomeamos os curso de maneira a deixar apenas a área geral de estudo, para diminuir o número de correspondências no gráfico. 
+Por exemplo, os vários ramos da física foram resumidos apenas em física.
+
+```{r}
+astronauts$Study[astronauts$Study=="Aeronautical & Astronautical Engineering"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Aeronautical Engineering Systems"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Aeronautical System"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Aeronautical Systems"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Aeronautics & Astronautics"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Aeronautical Engineering"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Aeronautical Science"]="Aeronautics"
+astronauts$Study[astronauts$Study=="Applied Plasma Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Atmospheric Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Engineering Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Physical Science"]="Physics"
+astronauts$Study[astronauts$Study=="Solid State Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Applied Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Solar Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Physical Chemistry"]="Physics"
+astronauts$Study[astronauts$Study=="Space Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Nuclear Physics"]="Physics"
+astronauts$Study[astronauts$Study=="Mechanical  Engineering"]="Mechanical Engineering"
+astronauts$Study[astronauts$Study=="Engineering Mechanics"]="Mechanical Engineering"
+astronauts$Study[astronauts$Study=="Earth & Planetary Sciences"]="Earth Sciences"
+astronauts$Study[astronauts$Study=="Planetary Science"]="Earth Sciences"
+astronauts$Study[astronauts$Study=="Applied Mathematics"]="Mathematics"
+astronauts$Study[astronauts$Study=="Astronomy & Astrophysics"]="Astronomy"
+astronauts$Study[astronauts$Study=="Aerospace Engineering Sciences"]="Aerospace"
+astronauts$Study[astronauts$Study=="Aerospace Engineering"]="Aerospace"
+astronauts$Study[astronauts$Study=="Mechanical & Aerospace Engineering"]="Aerospace"
+astronauts$Study[astronauts$Study=="Astronomy & Astrophysics"]="Aerospace"
+astronauts$Study[astronauts$Study=="Aerospace Science"]="Aerospace"
+astronauts$Study[astronauts$Study=="Astronautical & Aeronautical Engineering"]="Astronautics"
+astronauts$Study[astronauts$Study=="Astronautical Engineering"]="Astronautics"
+astronauts$Study[astronauts$Study=="Electrical & Computer Engineering"]="Electrical Engineering"
+astronauts$Study[astronauts$Study=="Computer Systems"]="Computer Science"
+astronauts$Study[astronauts$Study=="Biometeorology"]="Meteorology"
+astronauts$Study[astronauts$Study=="Technology & Policy"]="Technology"
+astronauts$Study[astronauts$Study=="Space Technology"]="Technology"
+astronauts$Study[astronauts$Study=="Science & Technology Administration"]="Administration"
+astronauts$Study[astronauts$Study=="Public Administration"]="Administration"
+astronauts$Study[astronauts$Study=="Systems Engineering"]="Systems Management"
+astronauts$Study[astronauts$Study=="Information Systems"]="Systems Management"
+astronauts$Study[astronauts$Study=="Business Administration"]="Business"
+astronauts$Study[astronauts$Study=="Business Management"]="Business"
+astronauts$Study[astronauts$Study=="Bioengineering"]="Biology"
+astronauts$Study[astronauts$Study=="Cancer Biology"]="Biology"
+astronauts$Study[astronauts$Study=="Biochemistry"]="Biology"
+astronauts$Study[astronauts$Study=="Materials Science Engineering"]="Applied Science"
+astronauts$Study[astronauts$Study=="Engineering Science"]="Applied Science"
+astronauts$Study[astronauts$Study=="Materials Science"]="Applied Science"
+astronauts$Study[astronauts$Study=="Environmental Science"]="Applied Science"
+astronauts$Study[astronauts$Study=="Polymer Science & Engineering"]="Applied Science"
+astronauts$Study[astronauts$Study=="Engineering Management"]="Engineering"
+astronauts$Study[astronauts$Study=="Ocean Engineering"]="Oceanography"
+astronauts$Study[astronauts$Study=="Chemical Engineering"]="Chemistry"
+```
+
+## Medidas de resumo:
+
+```{r}
+summary(astronauts)
+```
+
+-   **Variável 'Country' (Categórica)**
+
+```{r message=FALSE, warning=FALSE}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x=Country)) + geom_bar(aes(fill = "red")) + coord_flip() + guides(fill = FALSE) 
+
+graf
+```
+
+-   **Variável 'Military Rank' (Categórica ordinal)**
+
+```{r}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Military.Rank)) + geom_bar(aes(fill = Gender)) + coord_flip()
+
+graf
+```
+
+-   **Variável 'Space Flights' (quantitativa discreta)**
+
+```{r}
+mean(astronauts$Space.Flights)
+```
+
+```{r}
+min(astronauts$Space.Flights)
+max(astronauts$Space.Flights)
+```
+
+```{r}
+median(astronauts$Space.Flights)
+```
+
+```{r}
+quantile(astronauts$Space.Flights)
+
+```
+
+```{r}
+var(astronauts$Space.Flights)
+
+sd(astronauts$Space.Flights)
+```
+
+```{r}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Space.Flights)) + geom_bar(aes(fill= Country))
+
+graf
+```
+
+-   **Variável 'Study'**
+
+```{r fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Study)) + geom_bar(aes(fill = Country)) + coord_flip()
+
+graf
+```
+
+```{r fig.height=6, fig.width=7, message=FALSE, warning=FALSE}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Study)) + geom_bar(aes(fill = Gender, angle=90)) +  coord_flip()
+
+graf
+
+```
+
+-   **Space Flights X Gender**
+
+```{r}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Gender)) + geom_bar(aes( fill = Gender))
+
+graf
+```
+
+```{r}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Gender)) + geom_bar(aes( fill = Country))
+
+graf
+```
+
+-   **Space Flights x Country**
+
+```{r}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Space.Flights, y = Country, color = Gender)) + geom_point() + geom_jitter(position = position_jitter(width = 0.5))
+
+graf
+```
+
+-   **Military Rank x Country**
+
+```{r fig.height=5, fig.width=7}
+graf <- ggplot(data= astronauts,
+                mapping = aes(x= Military.Rank, y = Country, color = Country)) + geom_point() +
+  theme(axis.text.x = element_text(size = 10, angle = 90)) + geom_jitter(position = position_jitter(width = 0.5))
+
+graf
+```
+
+## Exemplo de ggsankey
+
+```{r}
+s1 <- sample(x= c("Single",
+                  "Married", 
+                  "Married with kids", 
+                  "Married Without kids"), 
+              size = 100, 
+              replace=TRUE)
+
+s2 <- sample(x= c("Male", 
+                  "Female"), 
+             size = 100, 
+             replace=TRUE)
+
+s3 <- sample(x= c("Happy", 
+                  "Not Happy"), 
+             size = 100, 
+             replace=TRUE)
+
+d <- data.frame(cbind(s1,s2,s3))
+names(d) <- c('Relationship', 
+              'Gender', 
+              'Outcome')
+df <- d%>%
+  make_long(Relationship, 
+            Gender, 
+            Outcome)
+```
+
+```{r}
+pl <- ggplot(df, aes(x = x,                        
+                     next_x = next_x,                                     
+                     node = node,
+                     next_node = next_node,        
+                     fill = factor(node)))
+                     
+pl <- pl +geom_sankey(flow.alpha = 0.5,          
+                      node.color = "black",             
+                      show.legend = TRUE)       
+
+pl
+```
+
+
+# Parte C
+
+- O público alvo é o público em geral interessado em curiosidades científicas e que queira entender melhor como é a maioria dos astronautas da Nasa.
+
+- A peça gráfica foi feita com o objetivo de ser criativa e representar o contexto dos dados na forma do gráfico. Para isso utilizamos do gráfico Sankey, com o intuito de referenciar um foguete espacial, o que também explica o uso das cores e elementos de contexto ao redor.
+
+- Para a produção da peça gráfica, fizemos uso do R para a confecção do gráfico (ggplot2, ggsankey) e manipulação dos dados(dplyr, stringr), juntamente com o excel para auxiliar o entendimento e visualização da tabela e, por fim, usamos o Canva para adição dos demais elementos.
+
+- Durante o processo encontramos um grande desafio, pela maneira como estava disposta as duas colunas sobre as formações dos astronautas. Essa variável apresentava todos os cursos que cada astronauta possui, separada por ponto e vírgula, o que impossibilitava plotar o gráfico que queriamos diretamente com essa informação. No processo tivemos que arrumar isso, como está descrito passo a passo na parte B, o que gerou grande aprendizado, além do conhecimento de um novo gráfico diferente e como produzi-lo com as ferramentas do R.
+
+# Parte D
+ 
+- Produção do gráfico final para a peça gráfica.
+
+```{r, warning=FALSE}
+df <- astronauts %>% make_long(Gender,Space.Flights, Military.Rank, Country, Study)
+```
+
+
+```{r fig.height=55, fig.width=107}
+
+cbPalette <- c("#4038C9", "#657CFF",  "#71BBCC", "#DB5C18")
+
+pl <- ggplot(df, aes(x = x,
+               next_x = next_x,
+               node = node,
+               next_node = next_node,
+               fill = next_x,
+               label = node)) +
+  geom_sankey(flow.alpha = 0.5, show.legend = FALSE, node.alpha = 0.7) +
+  theme_sankey(base_size = 150) +
+  theme(legend.position = "none") +
+  geom_sankey_text(size = 20, hjust = 0,angle = 15, color = "white", position = position_nudge(x = 0.1)) +
+  scale_fill_manual(values = cbPalette) +
+  theme(panel.background = element_rect(fill = "#080833"))
+pl
+ 
+```
